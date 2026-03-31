@@ -781,6 +781,6 @@ const exampleData = [
   </html>
     `;
     
-    utils.downloadFile(htmlTemplate, 'nuclei-findings.html', 'text/html');
+    utils.downloadFile(htmlTemplate, 'cart-expressreport.html', 'text/html');
   }
   
