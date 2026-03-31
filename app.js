@@ -671,9 +671,6 @@ const exampleData = [
             
             <div class="finding-meta">
               <div class="finding-meta-item">
-                <strong>Template:</strong> ${utils.escapeHtml(finding.template || 'Unknown')}
-              </div>
-              <div class="finding-meta-item">
                 <strong>Host:</strong> ${utils.escapeHtml(host)}
               </div>
               <div class="finding-meta-item">
