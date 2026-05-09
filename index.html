@@ -7,6 +7,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
 </head>
 <body>
@@ -153,6 +156,7 @@
             <option value="json">JSON</option>
             <option value="csv">CSV</option>
             <option value="html">HTML Report</option>
+            <option value="pdf">PDF Report</option>
           </select>
           <label class="export-filter"><input type="checkbox" id="export-filtered" checked /> Export filtered results only</label>
         </div>

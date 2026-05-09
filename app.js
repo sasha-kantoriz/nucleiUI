@@ -426,12 +426,7 @@ const exampleData = [
     const exportFormat = document.getElementById('export-format').value;
     const exportFiltered = document.getElementById('export-filtered').checked;
     const dataToExport = exportFiltered ? state.filteredResults : state.scanResults;
-    
-    if (dataToExport.length === 0) {
-      alert('No findings to export.');
-      return;
-    }
-    
+
     switch (exportFormat) {
       case 'json':
         exportJSON(dataToExport);
@@ -442,14 +437,336 @@ const exampleData = [
       case 'html':
         exportHTML(dataToExport);
         break;
+      case 'pdf':
+        exportPDF(dataToExport);
+        break;
       default:
         alert('Unsupported export format');
     }
   }
-  
+
+  function exportPDF(data) {
+    const btn = document.getElementById('export-btn');
+    const originalText = btn.innerHTML;
+
+    if (!data || data.length === 0) {
+      alert('No findings to export.');
+      return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+
+    setTimeout(async () => {
+      try {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+        const logoDataUrl = await getPdfLogoDataUrl();
+        const page = {
+          width: 210,
+          height: 297,
+          marginX: 14,
+          marginTop: 16,
+          marginBottom: 16,
+          contentWidth: 182
+        };
+        const severityColors = {
+          critical: [231, 76, 60],
+          high: [230, 126, 34],
+          medium: [243, 156, 18],
+          low: [52, 152, 219],
+          info: [127, 140, 141],
+          unknown: [127, 140, 141]
+        };
+        let y = page.marginTop;
+
+        const getSeverity = finding => (finding.info?.severity || 'info').toLowerCase();
+        const getSeverityColor = severity => severityColors[severity] || severityColors.unknown;
+        const setText = (size = 10, style = 'normal', color = [51, 51, 51], font = 'helvetica') => {
+          pdf.setFont(font, style);
+          pdf.setFontSize(size);
+          pdf.setTextColor(...color);
+        };
+        const addPage = () => {
+          pdf.addPage();
+          y = page.marginTop;
+        };
+        const remainingSpace = () => page.height - page.marginBottom - y;
+        const ensureSpace = height => {
+          if (y + height > page.height - page.marginBottom) {
+            addPage();
+          }
+        };
+        const ensureBlockStart = height => {
+          if (y > page.marginTop && remainingSpace() < height) {
+            addPage();
+          }
+        };
+        const addWrappedText = (text, options = {}) => {
+          const {
+            x = page.marginX,
+            width = page.contentWidth,
+            size = 10,
+            lineHeight = 5,
+            style = 'normal',
+            color = [51, 51, 51],
+            font = 'helvetica',
+            spacingAfter = 0
+          } = options;
+          const safeText = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          const lines = pdf.splitTextToSize(safeText || '-', width);
+
+          setText(size, style, color, font);
+          if (lines.length > 1) {
+            ensureSpace(lineHeight * Math.min(lines.length, 2));
+          }
+
+          lines.forEach(line => {
+            ensureSpace(lineHeight);
+            pdf.text(line, x, y);
+            y += lineHeight;
+          });
+          y += spacingAfter;
+        };
+        const addPreformattedText = (title, text) => {
+          if (!text) return;
+
+          addSectionTitle(title, 8);
+          const normalized = String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          const chunks = normalized.split('\n').flatMap(line => {
+            const maxLineLength = 150;
+            if (line.length <= maxLineLength) return [line || ' '];
+            const parts = [];
+            for (let i = 0; i < line.length; i += maxLineLength) {
+              parts.push(line.slice(i, i + maxLineLength));
+            }
+            return parts;
+          });
+
+          setText(7, 'normal', [36, 41, 46], 'courier');
+          chunks.forEach(rawLine => {
+            const lines = pdf.splitTextToSize(rawLine, page.contentWidth - 6);
+            lines.forEach(line => {
+              ensureSpace(4);
+              pdf.setDrawColor(225, 228, 232);
+              pdf.line(page.marginX, y - 3, page.marginX, y + 1);
+              pdf.text(line, page.marginX + 3, y);
+              y += 4;
+            });
+          });
+          y += 2;
+        };
+        const addSectionTitle = (title, keepWithNext = 6) => {
+          ensureBlockStart(5 + keepWithNext);
+          setText(10, 'bold', [41, 128, 185]);
+          pdf.text(title, page.marginX, y);
+          y += 5;
+        };
+        const addKeyValue = (key, value) => {
+          addWrappedText(`${key}: ${value || '-'}`, {
+            size: 8.5,
+            lineHeight: 4,
+            color: [102, 102, 102],
+            spacingAfter: 1
+          });
+        };
+
+        setText(20, 'bold', [41, 128, 185]);
+        pdf.text('Nuclei Scan Report', page.marginX, y);
+        addPdfLogo(pdf, logoDataUrl, page);
+        y += 8;
+        setText(10, 'normal', [102, 102, 102]);
+        pdf.text(`Security Analysis Summary - ${new Date().toLocaleString()}`, page.marginX, y);
+        y += 8;
+        pdf.setDrawColor(52, 152, 219);
+        pdf.setLineWidth(0.7);
+        pdf.line(page.marginX, y, page.width - page.marginX, y);
+        y += 10;
+
+        const summary = [
+          ['Total', data.length, [51, 51, 51]],
+          ['Critical', data.filter(f => getSeverity(f) === 'critical').length, severityColors.critical],
+          ['High', data.filter(f => getSeverity(f) === 'high').length, severityColors.high],
+          ['Medium', data.filter(f => getSeverity(f) === 'medium').length, severityColors.medium],
+          ['Low', data.filter(f => getSeverity(f) === 'low').length, severityColors.low],
+          ['Info', data.filter(f => getSeverity(f) === 'info').length, severityColors.info]
+        ];
+        summary.forEach(([label, value, color], index) => {
+          const cardX = page.marginX + (index % 3) * 62;
+          const cardY = y + Math.floor(index / 3) * 20;
+          pdf.setDrawColor(238, 238, 238);
+          pdf.setFillColor(248, 249, 250);
+          pdf.roundedRect(cardX, cardY, 56, 15, 1.5, 1.5, 'FD');
+          setText(14, 'bold', color);
+          pdf.text(String(value), cardX + 4, cardY + 7);
+          setText(7, 'normal', [119, 119, 119]);
+          pdf.text(label.toUpperCase(), cardX + 4, cardY + 12);
+        });
+        y += 48;
+
+        addWrappedText('Findings', { size: 15, style: 'bold', color: [44, 62, 80], spacingAfter: 3 });
+
+        for (let index = 0; index < data.length; index++) {
+          const finding = data[index];
+          const severity = getSeverity(finding);
+          const severityColor = getSeverityColor(severity);
+          const title = finding.info?.name || finding.template || 'Unknown Finding';
+          const host = finding.host || finding['matched-at'] || 'Unknown Host';
+          const ip = finding.ip || 'Unknown IP';
+          const timestamp = finding.timestamp ? new Date(finding.timestamp).toLocaleString() : 'Unknown Time';
+          const tags = finding.info?.tags || [];
+          const references = finding.info?.reference
+            ? (Array.isArray(finding.info.reference) ? finding.info.reference : [finding.info.reference])
+            : [];
+          const titleLines = pdf.splitTextToSize(`${index + 1}. ${title}`, 140);
+          const introHeight = 24 + (titleLines.length * 5) + (tags.length > 0 ? 5 : 0);
+
+          btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating PDF... ${index + 1}/${data.length}`;
+          ensureBlockStart(Math.min(68, Math.max(40, introHeight)));
+          pdf.setDrawColor(225, 228, 232);
+          pdf.line(page.marginX, y, page.width - page.marginX, y);
+          y += 6;
+
+          setText(12, 'bold', [44, 62, 80]);
+          titleLines.forEach(line => {
+            ensureSpace(5);
+            pdf.text(line, page.marginX, y);
+            y += 5;
+          });
+
+          pdf.setFillColor(...severityColor);
+          pdf.roundedRect(page.width - page.marginX - 28, y - 10, 28, 7, 1.5, 1.5, 'F');
+          setText(7, 'bold', [255, 255, 255]);
+          pdf.text(severity.toUpperCase(), page.width - page.marginX - 26, y - 5);
+          y += 2;
+
+          addKeyValue('Host', host);
+          addKeyValue('IP', ip);
+          addKeyValue('Time', timestamp);
+          if (tags.length > 0) {
+            addKeyValue('Tags', tags.join(', '));
+          }
+
+          addSectionTitle('Description');
+          addWrappedText(finding.info?.description || 'No description available', {
+            size: 9,
+            lineHeight: 4.5,
+            spacingAfter: 2
+          });
+
+          if (references.length > 0) {
+            addSectionTitle('References');
+            references.forEach(ref => addWrappedText(ref, {
+              size: 8,
+              lineHeight: 4,
+              color: [41, 128, 185],
+              spacingAfter: 0.5
+            }));
+            y += 1;
+          }
+
+          addPreformattedText('Request', finding.request);
+          addPreformattedText('Response', finding.response);
+
+          if (finding['extracted-results']) {
+            addSectionTitle('Extracted Results');
+            const extracted = Array.isArray(finding['extracted-results'])
+              ? finding['extracted-results'].join('\n')
+              : finding['extracted-results'];
+            addWrappedText(extracted, { size: 9, lineHeight: 4.5, spacingAfter: 2 });
+          }
+
+          y += 4;
+          if (index % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+        }
+
+        const pageCount = pdf.internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+          pdf.setPage(i);
+          setText(8, 'normal', [102, 102, 102]);
+          pdf.text(`Generated by Nuclei Scan Results Viewer - Page ${i} of ${pageCount}`, page.marginX, 288);
+        }
+
+        pdf.save('cart-express-report.pdf');
+      } catch (err) {
+        console.error('PDF Export Error:', err);
+        alert('Error generating PDF. Try exporting a filtered (smaller) list.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }, 100);
+  }
+
+  function addPdfLogo(pdf, logoDataUrl, page) {
+    if (!logoDataUrl) {
+      return;
+    }
+
+    pdf.addImage(logoDataUrl, 'PNG', page.width - page.marginX - 56, page.marginTop - 6, 56, 16);
+  }
+
+  async function getPdfLogoDataUrl() {
+    try {
+      const logoUrlCandidates = [
+        document.querySelector('.nav-logo-img')?.currentSrc,
+        document.querySelector('.nav-logo-img')?.src,
+        new URL('assets/logo-telkomsigma.svg', window.location.origin + '/').href,
+        new URL('assets/logo-telkomsigma.svg', document.baseURI).href
+      ].filter(Boolean);
+      let response = null;
+
+      for (const logoUrl of [...new Set(logoUrlCandidates)]) {
+        response = await fetch(logoUrl);
+
+        if (response.ok) {
+          break;
+        }
+
+        response = null;
+      }
+
+      if (!response) return null;
+
+      const svgText = await response.text();
+      const embeddedPng = svgText.match(/xlink:href="(data:image\/png;base64,[^"]+)"/);
+
+      if (embeddedPng) {
+        return embeddedPng[1];
+      }
+
+      const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+      const objectUrl = URL.createObjectURL(svgBlob);
+
+      try {
+        const image = await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = objectUrl;
+        });
+        const scale = 2;
+        const canvas = document.createElement('canvas');
+        canvas.width = 184 * scale;
+        canvas.height = 54 * scale;
+        const context = canvas.getContext('2d');
+
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/png');
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    } catch (error) {
+      console.warn('Unable to load PDF logo:', error);
+      return null;
+    }
+  }
+
   function exportJSON(data) {
     const jsonString = JSON.stringify(data, null, 2);
-    utils.downloadFile(jsonString, 'nuclei-findings.json', 'application/json');
+    utils.downloadFile(jsonString, 'cart-express-report.json', 'application/json');
   }
   
   function exportCSV(data) {
@@ -483,39 +800,44 @@ const exampleData = [
       ...rows.map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
     ].join('\n');
     
-    utils.downloadFile(csvContent, 'nuclei-findings.csv', 'text/csv');
+    utils.downloadFile(csvContent, 'cart-express-report.csv', 'text/csv');
   }
-  
-  function exportHTML(data) {
-    // Create HTML template
-    const htmlTemplate = `
+
+   function exportHTML(data) {
+     utils.downloadFile(getReportTemplate(data), 'cart-express-report.html', 'text/html');
+   }
+
+   function getReportTemplate(data) {
+     return `
   <!DOCTYPE html>
   <html lang="en">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scan Results</title>
+    <title>Nuclei Scan Report</title>
     <style>
       body {
-        font-family: Arial, sans-serif;
-        line-height: 1.6;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        line-height: 1.5;
         color: #333;
-        max-width: 1200px;
+        max-width: 100%;
         margin: 0 auto;
-        padding: 20px;
+        padding: 0;
+        background: #fff;
       }
       h1 {
         color: #2980b9;
         border-bottom: 2px solid #eee;
         padding-bottom: 10px;
+        font-size: 24pt;
       }
       .report-header {
         display: flex;
         align-items: center;
         gap: 24px;
-        margin-bottom: 24px;
-        padding-bottom: 16px;
-        border-bottom: 2px solid #eee;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #3498db;
       }
       .report-branding {
         display: flex;
@@ -525,12 +847,15 @@ const exampleData = [
         width: 100%;
       }
       .report-logo {
-        width: 180px;
+        width: 150px;
         max-width: 100%;
         height: auto;
         flex-shrink: 0;
       }
-      .report-title h1 {
+      .report-title {
+        flex-grow: 1;
+      }
+      .report-title h1 { 
         margin: 0 0 6px;
         border-bottom: none;
         padding-bottom: 0;
@@ -538,50 +863,58 @@ const exampleData = [
       .report-title p {
         margin: 0;
         color: #666;
+        font-size: 11pt;
       }
       .stats {
         display: flex;
         flex-wrap: wrap;
         gap: 15px;
-        margin: 20px 0;
+        margin: 25px 0;
       }
       .stat-item {
         background: #f8f9fa;
-        border-radius: 5px;
+        border: 1px solid #eee;
+        border-radius: 6px;
         padding: 15px;
         text-align: center;
         min-width: 120px;
       }
       .stat-value {
-        font-size: 24px;
+        font-size: 20pt;
         font-weight: bold;
+        line-height: 1;
       }
       .critical { color: #e74c3c; }
       .high { color: #e67e22; }
       .medium { color: #f39c12; }
       .low { color: #3498db; }
       .info { color: #7f8c8d; }
+      .stat-label { font-size: 9pt; text-transform: uppercase; color: #777; margin-top: 5px; }
       
       .findings {
         margin-top: 30px;
       }
       .finding {
         background: #fff;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 15px;
-        margin-bottom: 20px;
+        border: 1px solid #e1e4e8;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 25px;
+        page-break-inside: auto;
+        break-inside: auto;
       }
       .finding-header {
         display: flex;
         justify-content: space-between;
+        align-items: flex-start;
         border-bottom: 1px solid #eee;
         padding-bottom: 10px;
         margin-bottom: 10px;
       }
       .finding-title {
-        font-size: 18px;
+        font-size: 14pt;
         font-weight: bold;
+        color: #2c3e50;
       }
       .finding-severity {
         padding: 3px 10px;
@@ -607,6 +940,7 @@ const exampleData = [
         display: flex;
         align-items: center;
         gap: 5px;
+        font-size: 10pt;
       }
       .finding-tags {
         display: flex;
@@ -617,35 +951,42 @@ const exampleData = [
       .tag {
         background: #f0f0f0;
         padding: 3px 8px;
-        border-radius: 3px;
-        font-size: 12px;
+        border-radius: 4px;
+        font-size: 9pt;
         color: #666;
       }
       .finding-section {
         margin-bottom: 15px;
       }
       .finding-section h3 {
-        font-size: 16px;
-        margin-bottom: 5px;
+        font-size: 12pt;
+        margin: 15px 0 8px 0;
         color: #2980b9;
+        border-bottom: 1px solid #f0f0f0;
+        padding-bottom: 4px;
+        break-after: avoid;
       }
       .request-response {
-        background: #f8f9fa;
-        padding: 10px;
-        border-radius: 3px;
-        font-family: monospace;
+        background: #f6f8fa;
+        padding: 12px;
+        border-left: 4px solid #e1e4e8;
+        border-radius: 0 6px 6px 0;
+        font-family: 'Courier New', Courier, monospace;
         white-space: pre-wrap;
-        overflow-x: auto;
-        font-size: 13px;
-        max-height: 300px;
-        overflow-y: auto;
+        word-break: break-all;
+        font-size: 9pt;
+        color: #24292e;
+        line-height: 1.4;
+        /* Essential for full view in PDF */
+        max-height: none;
+        overflow: visible;
       }
       .footer {
-        margin-top: 40px;
+        margin-top: 50px;
         text-align: center;
-        font-size: 14px;
+        font-size: 10pt;
         color: #666;
-        border-top: 1px solid #eee;
+        border-top: 2px solid #eee;
         padding-top: 20px;
       }
     </style>
@@ -654,7 +995,8 @@ const exampleData = [
     <div class="report-header">
       <div class="report-branding">
         <div class="report-title">
-          <h1>Scan Results</h1>
+          <h1>Nuclei Scan Report</h1>
+          <p>Security Analysis Summary</p>
         </div>
         <div>
             <svg class="report-logo" width="184" height="54" viewBox="0 0 184 54" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -780,7 +1122,4 @@ const exampleData = [
   </body>
   </html>
     `;
-    
-    utils.downloadFile(htmlTemplate, 'cart-expressreport.html', 'text/html');
-  }
-  
+   }
