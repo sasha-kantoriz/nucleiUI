@@ -572,7 +572,7 @@ const exampleData = [
         };
 
         setText(20, 'bold', [41, 128, 185]);
-        pdf.text('Nuclei Scan Report', page.marginX, y);
+        pdf.text('Cart Scan Report', page.marginX, y);
         addPdfLogo(pdf, logoDataUrl, page);
         y += 8;
         setText(10, 'normal', [102, 102, 102]);
@@ -814,7 +814,7 @@ const exampleData = [
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nuclei Scan Report</title>
+    <title>Cart Scan Report</title>
     <style>
       body {
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -995,7 +995,7 @@ const exampleData = [
     <div class="report-header">
       <div class="report-branding">
         <div class="report-title">
-          <h1>Nuclei Scan Report</h1>
+          <h1>Cart Scan Report</h1>
           <p>Security Analysis Summary</p>
         </div>
         <div>
