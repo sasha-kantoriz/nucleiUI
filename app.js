@@ -482,6 +482,18 @@ const exampleData = [
 
         const getSeverity = finding => (finding.info?.severity || 'info').toLowerCase();
         const getSeverityColor = severity => severityColors[severity] || severityColors.unknown;
+        const getAiApprovalStatus = finding => finding.ai_approval_status || finding['ai_approval_status'];
+        const formatListValue = value => {
+          if (Array.isArray(value)) {
+            return value.length > 0 ? value.join(', ') : '-';
+          }
+
+          if (value == null || value === '') {
+            return '-';
+          }
+
+          return String(value);
+        };
         const setText = (size = 10, style = 'normal', color = [51, 51, 51], font = 'helvetica') => {
           pdf.setFont(font, style);
           pdf.setFontSize(size);
@@ -645,6 +657,36 @@ const exampleData = [
           addKeyValue('Time', timestamp);
           if (tags.length > 0) {
             addKeyValue('Tags', tags.join(', '));
+          }
+
+          const aiApprovalStatus = getAiApprovalStatus(finding);
+          if (aiApprovalStatus && (aiApprovalStatus.verdict || aiApprovalStatus.reason)) {
+            addSectionTitle('AI Approval Status');
+            addKeyValue('Verdict', aiApprovalStatus.verdict || '-');
+            addWrappedText(`Reason: ${aiApprovalStatus.reason || '-'}`, {
+              size: 8.5,
+              lineHeight: 4,
+              color: [102, 102, 102],
+              spacingAfter: 1
+            });
+          }
+
+          if ((aiApprovalStatus?.verdict || '').toLowerCase() === 'valid') {
+            const remediation = finding.info?.remediation;
+            const tactics = finding.info?.tactics;
+            const technics = finding.info?.technics;
+
+            if (remediation) {
+              addPreformattedText('Remediation', remediation);
+            }
+
+            if (tactics != null) {
+              addKeyValue('Tactics', formatListValue(tactics));
+            }
+
+            if (technics != null) {
+              addKeyValue('Technics', formatListValue(technics));
+            }
           }
 
           addSectionTitle('Description');
