@@ -1,6 +1,6 @@
 import os
 from functools import wraps
-from flask import Flask, request, Response, render_template
+from flask import Flask, Blueprint, request, Response, render_template
 
 
 app = Flask(
@@ -31,7 +31,10 @@ def requires_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-@app.route("/")
+
+bp = Blueprint('nuclei', __name__, url_prefix='/nucleiui')
+
+@bp.route('/')
 @requires_auth
 def index():
     return render_template("index.html")
