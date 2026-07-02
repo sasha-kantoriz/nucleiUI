@@ -6,3 +6,7 @@ services:
       - 5000:5000
     environment:
       - SCRIPT_NAME=/nucleiui
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
