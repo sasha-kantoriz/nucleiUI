@@ -4,4 +4,4 @@ RUN pip install flask gunicorn
 COPY . /application
 WORKDIR /application
 
-CMD gunicorn main:app -b 0.0.0.0:5000 --access-logfile - --log-levle info
+CMD gunicorn main:app -b 0.0.0.0:5000 --access-logfile - --log-level info
