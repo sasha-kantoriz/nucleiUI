@@ -7,7 +7,7 @@ app = Flask(
     __name__,
     template_folder=os.path.abspath(os.path.dirname(__file__)),
     static_folder=os.path.abspath(os.path.dirname(__file__)),
-    static_url_path='/nucleiui/static'
+    static_url_path='/static'
 )
 
 APPLICATION_USERNAME = os.environ.get("APPLICATION_USERNAME", "admin")
