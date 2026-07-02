@@ -5,8 +5,8 @@ from flask import Flask, Blueprint, request, Response, render_template
 
 app = Flask(
     __name__,
-    template_folder=os.path.abspath(os.path.dirname(__file__)),
-    static_folder=os.path.abspath(os.path.dirname(__file__)),
+    template_folder=os.path.join(os.path.abspath(os.path.dirname(__file__)), "templates"),
+    static_folder=os.path.join(os.path.abspath(os.path.dirname(__file__)), "static"),
     static_url_path='/static'
 )
 
@@ -32,9 +32,7 @@ def requires_auth(f):
     return decorated
 
 
-bp = Blueprint('nuclei', __name__, url_prefix='/nucleiui')
-
-@bp.route('/')
+@app.route('/')
 @requires_auth
 def index():
     return render_template("index.html")
