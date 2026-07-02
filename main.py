@@ -3,7 +3,12 @@ from functools import wraps
 from flask import Flask, request, Response, render_template
 
 
-app = Flask(__name__, template_folder=os.path.abspath(os.path.dirname(__file__)), static_folder=os.path.abspath(os.path.dirname(__file__)))
+app = Flask(
+    __name__,
+    template_folder=os.path.abspath(os.path.dirname(__file__)),
+    static_folder=os.path.abspath(os.path.dirname(__file__)),
+    static_url_path='/nucleiui/static'
+)
 
 APPLICATION_USERNAME = os.environ.get("APPLICATION_USERNAME", "admin")
 APPLICATION_PASSWORD = os.environ.get("APPLICATION_PASSWORD", "AppS3cr3t")
